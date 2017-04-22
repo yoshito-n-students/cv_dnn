@@ -122,12 +122,17 @@ catkin_package(
 
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
-# include_directories(include)
+list(
+  GET OpenCV_INCLUDE_DIRS 0 
+  OpenCV_ROOT_INCLUDE_DIR
+  )
 include_directories(
   include
   ${catkin_INCLUDE_DIRS}
-  ${CMAKE_CURRENT_BINARY_DIR}
-  ${CMAKE_CURRENT_SOURCE_DIR}/src
+  ${OpenCV_ROOT_INCLUDE_DIR}/opencv2 # to include "cvconfig.h" in sources
+  ${CMAKE_CURRENT_BINARY_DIR} # to include auto-generated headers
+  ${CMAKE_CURRENT_BINARY_DIR}/modules/dnn # to include auto-generated headers
+  ${CMAKE_CURRENT_SOURCE_DIR}/src # to include "precomp.hpp" in sources in subdirectories
 )
 
 ## Declare a C++ library
@@ -138,13 +143,29 @@ file(
   ${CMAKE_CURRENT_SOURCE_DIR}/src/layers/*.cpp
 )
 protobuf_generate_cpp(
-  proto_HDRS proto_SRCS src/caffe/caffe.proto
+  proto_HDRS proto_SRCS 
+  src/caffe/caffe.proto
+)
+set(
+  cl_SRC
+  ${CMAKE_CURRENT_BINARY_DIR}/modules/dnn/opencl_kernels_dnn.cpp  
+)
+file(
+  GLOB cl_FILES
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/opencl/*.cl
+)
+add_custom_command(
+  OUTPUT ${cl_SRC}
+  COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_CURRENT_BINARY_DIR}/modules/dnn
+  COMMAND ${CMAKE_COMMAND} -D MODULE_NAME=dnn -D CL_DIR=${CMAKE_CURRENT_SOURCE_DIR}/src/opencl -D OUTPUT=${cl_SRC} -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/cl2cpp.cmake
+  DEPENDS ${cl_FILES} ${CMAKE_CURRENT_SOURCE_DIR}/cmake/cl2cpp.cmake
   )
 add_library(
   cv_dnn
   ${cv_dnn_SRCS}
   ${proto_HDRS}
   ${proto_SRCS}
+  ${cl_SRC}
   )
 
 ## Add cmake target dependencies of the library
